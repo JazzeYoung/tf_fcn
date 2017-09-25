@@ -527,24 +527,27 @@ def main(_):
           #slim.losses.softmax_cross_entropy(pred_annotation, labels, label_smoothing=True, weights=1.0)
           print("Pred_annot", pred_annotation, "Labels", labels,"fc8s", fc8s)
 
+
+
+
           tf.losses.sparse_softmax_cross_entropy(logits=tf.to_float(fc8s),labels=tf.to_int32(labels), weights=1.0, scope="entropy")
-
-
 
           #loss = tf.reduce_mean((tf.losses.sparse_softmax_cross_entropy(logits=tf.to_float(pred_annotation),labels=tf.to_int32(labels),scope="entropy")))
 
-          return end_points
+          return images, labels, pred_annotation, end_points
 
        summaries = set(tf.get_collection(tf.GraphKeys.SUMMARIES))
        clones = model_deploy.create_clones(deploy_config, clone_fn, [train_batch_queue])
-       #clones2 = model_deploy.create_clones(deploy_config, clone_fn, [val_batch_queue])
        first_clone_scope = deploy_config.clone_scope(0)
-       #second_clone_scope = deploy_config.clone_scope(0)
 
        update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS, first_clone_scope)
 
-       end_points = clones[0].outputs
-       for end_point in end_points:                                             
+       images, labels, preds, end_points = clones[0].outputs
+       summaries.add(tf.summary.image("Original_images", images))
+       summaries.add(tf.summary.image("Ground_truth_masks", labels))
+       summaries.add(tf.summary.image("Prediction_masks", tf.to_float(preds)))
+
+       for end_point in end_points: 
           x = end_points[end_point]
           summaries.add(tf.summary.histogram('activations/' + end_point, x))
           summaries.add(tf.summary.scalar('sparsity/' + end_point,
@@ -598,7 +601,6 @@ def main(_):
 
        summaries |= set(tf.get_collection(tf.GraphKeys.SUMMARIES, first_clone_scope))
 
-#       summaries |= set(tf.get_collection(tf.GraphKeys.SUMMARIES, second_clone_scope))
 
        summary_op = tf.summary.merge(list(summaries), name='summary_op')
 
